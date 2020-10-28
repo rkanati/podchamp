@@ -12,9 +12,11 @@ categories  = ["command-line-utilities"]
 
 [dependencies]
 anyhow            = "1"
+#argh              = "0.1"
 chrono            = "0.4"
 clap              = "3.0.0-beta.2"
 diesel_migrations = "1.4"
+directories       = "3"
 dotenv            = "0.15"
 reqwest           = "0.10"
 url               = "2"

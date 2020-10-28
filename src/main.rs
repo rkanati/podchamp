@@ -19,13 +19,18 @@ use {
     chrono::prelude::*,
 };
 
-fn open_db(path: &std::ffi::OsStr) -> diesel::sqlite::SqliteConnection {
+fn open_db(path: &std::path::Path) -> anyhow::Result<diesel::sqlite::SqliteConnection> {
+    let e = || anyhow!("Invalid database path");
+
+    let dir = path.parent().ok_or(e())?;
+    std::fs::create_dir_all(dir)?;
+
+    let path = path.to_str().ok_or(e())?;
     use diesel::prelude::*;
-    let path = path.clone().to_str().unwrap();
-    let db = SqliteConnection::establish(path)
-        .expect("Error opening feeds database");
-    embedded_migrations::run(&db).unwrap();
-    db
+    let db = SqliteConnection::establish(path)?;
+    embedded_migrations::run(&db)?;
+
+    Ok(db)
 }
 
 async fn start_download(
@@ -71,8 +76,8 @@ async fn main() -> anyhow::Result<()> {
     let now = Utc::now();
 
     dotenv::dotenv().ok();
-    let opts = options::Options::parse();
-    let db = open_db(&opts.database_path);
+    let opts = options::Options::load();
+    let db = open_db(&opts.database_path)?;
 
     match &opts.command {
         Command::Add{name, link, backlog} => {
