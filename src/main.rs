@@ -210,7 +210,7 @@ async fn main() -> anyhow::Result<()> {
                         // parse GUIDs, ignoring items with none
                         .filter_map(|(item, date)| item
                             .guid()
-                            .map(|guid| (item, date, guid.value.to_owned()))
+                            .map(|guid| (item, date, guid.value().to_owned()))
                         )
                         .collect();
 

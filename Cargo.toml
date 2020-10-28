@@ -26,8 +26,9 @@ version = "1.4"
 features = ["sqlite", "chrono"]
 
 [dependencies.rss]
-git = "https://github.com/rust-syndication/rss.git"
-rev = "5efc53bd1b815e7094dab1efd9e82182f6d7d5df"
+#git = "https://github.com/rust-syndication/rss.git"
+#rev = "5efc53bd1b815e7094dab1efd9e82182f6d7d5df"
+version = "1.9"
 default-features = false
 
 [dependencies.tokio]
