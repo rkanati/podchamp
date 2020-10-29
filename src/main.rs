@@ -1,4 +1,5 @@
 
+#![forbid(unsafe_code)]
 #![feature(try_blocks)]
 
 #[macro_use]
