@@ -20,12 +20,12 @@ use {
 };
 
 fn open_db(path: &std::path::Path) -> anyhow::Result<diesel::sqlite::SqliteConnection> {
-    let e = || anyhow!("Invalid database path");
+    let bad_path_error = || anyhow!("Invalid database path");
 
-    let dir = path.parent().ok_or(e())?;
+    let dir = path.parent().ok_or_else(bad_path_error)?;
     std::fs::create_dir_all(dir)?;
 
-    let path = path.to_str().ok_or(e())?;
+    let path = path.to_str().ok_or_else(bad_path_error)?;
     use diesel::prelude::*;
     let db = SqliteConnection::establish(path)?;
     embedded_migrations::run(&db)?;

@@ -24,7 +24,7 @@ impl Default for DatabasePath {
 impl std::str::FromStr for DatabasePath {
     type Err = <std::path::PathBuf as std::str::FromStr>::Err;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        std::str::FromStr::from_str(s).map(|p| DatabasePath(p))
+        std::str::FromStr::from_str(s).map(DatabasePath)
     }
 }
 
