@@ -79,7 +79,7 @@ pub enum Command {
         /// A name for the feed
         name: String,
 
-        /// The feed's RSS link
+        /// The feed's link
         link: Url,
 
         /// Number of most-recent episodes to fetch. Defaults to 1.
@@ -123,7 +123,7 @@ pub enum Command {
 
 #[derive(Clap)]
 pub enum Modification {
-    /// Set the feed's RSS link
+    /// Set the feed's link
     Link {
         /// The new link
         link: Url,

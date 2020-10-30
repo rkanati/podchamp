@@ -18,6 +18,7 @@ use {
     crate::options::*,
     anyhow::{anyhow, bail},
     chrono::prelude::*,
+    url::Url,
 };
 
 fn open_db(path: &std::path::Path) -> anyhow::Result<diesel::sqlite::SqliteConnection> {
@@ -37,14 +38,15 @@ fn open_db(path: &std::path::Path) -> anyhow::Result<diesel::sqlite::SqliteConne
 async fn start_download(
     opts: &Options,
     feed: &models::Feed,
-    item: &rss::Item,
+    item: &feed_rs::model::Entry,
+    link: &Url,
     date: &DateTime<Utc>)
     -> anyhow::Result<()>
 {
-    let uri = item.enclosure().unwrap().url();
+    //let uri = item.enclosure().unwrap().url();
 
     let mut command = tokio::process::Command::new(&opts.downloader);
-    command.arg(uri);
+    command.arg(link.as_str());
 
     let date = date.format(&opts.date_format)
         .to_string();
@@ -52,9 +54,9 @@ async fn start_download(
     let envs = [
         ("PODCHAMP_FEED",        Some(&feed.name[..])),
         ("PODCHAMP_DATE",        Some(&date[..])),
-        ("PODCHAMP_TITLE",       item.title()),
-        ("PODCHAMP_AUTHOR",      item.author()),
-        ("PODCHAMP_DESCRIPTION", item.description()),
+        ("PODCHAMP_TITLE",       item.title.as_ref().map(|title| &title.content[..])),
+    //  ("PODCHAMP_AUTHOR",      item.author()),
+    //  ("PODCHAMP_DESCRIPTION", item.summary),
     ];
 
     for (var, value) in envs.iter() {
@@ -135,7 +137,7 @@ async fn main() -> anyhow::Result<()> {
                         .set(dsl::uri.eq(link.as_str()))
                         .execute(&db)?;
                     if n == 0 { bail!("{} is not a feed", feed); }
-                    eprintln!("Changed {} RSS link to {}", feed, link);
+                    eprintln!("Changed {} feed link to {}", feed, link);
                 }
 
                 Modification::Backlog{n} => {
@@ -191,35 +193,32 @@ async fn main() -> anyhow::Result<()> {
                 let result: anyhow::Result<_> = try {
                     let resp = client.execute(req).await?;
                     let feed_xml = resp.bytes().await?;
-                    let channel = rss::Channel::read_from(&feed_xml[..])?;
+                    let channel = feed_rs::parser::parse(&feed_xml[..])?;
 
                     // build a list of most-recent episodes
-                    let mut recents: Vec<_> = channel.items().iter()
-                        // ignore items with no actual episode to download
-                        .filter(|item| item.enclosure().is_some())
-                        // parse item dates, ignoring items with no date
-                        .filter_map(|item| item
-                            .pub_date()
-                            .and_then(|date| DateTime::parse_from_rfc2822(date).ok())
-                            .map(|date| {
-                                let date: DateTime<Utc> = date.into();
-                                (item, date)
-                            })
-                        )
+                    let mut recents: Vec<_> = channel.entries.iter()
+                        // ignore items with no date, or no actual episode to download
+                        .filter_map(|item| {
+                            let date = item.published?;
+                            let link = {
+                                let raw = &item
+                                    .content.as_ref()?
+                                    .src.as_ref()?
+                                    .href;
+                                use std::str::FromStr as _;
+                                Url::from_str(raw).ok()?
+                            };
+                            Some((item, link, date))
+                        })
                         // ignore time-travellers
-                        .filter(|(_, date)| date < &now)
-                        // parse GUIDs, ignoring items with none
-                        .filter_map(|(item, date)| item
-                            .guid()
-                            .map(|guid| (item, date, guid.value().to_owned()))
-                        )
+                        .filter(|(_, _, date)| date < &now)
                         .collect();
 
                     // sort the list by descending date
-                    recents.sort_unstable_by_key(|(_, date, _)| std::cmp::Reverse(*date));
+                    recents.sort_unstable_by_key(|(_, _, date)| std::cmp::Reverse(*date));
 
                     let backlog_start_index = (feed.backlog as usize).max(1).min(recents.len()) - 1;
-                    let (_, backlog_start_date, _) = recents[backlog_start_index];
+                    let (_, _, backlog_start_date) = recents[backlog_start_index];
 
                     let (threshold, set_fetch_since) = if let Some(since) = fetch_since {
                         if since <= backlog_start_date { (since,              false) }
@@ -237,15 +236,15 @@ async fn main() -> anyhow::Result<()> {
                     };
 
                     let to_fetch = recents.iter()
-                        .filter(|(_, date, _)| date >= &threshold);
+                        .filter(|(_, _, date)| date >= &threshold);
 
-                    for (item, date, guid) in to_fetch {
+                    for (item, link, date) in to_fetch {
                         // TODO do this in one go for all newest items
                         let already_got = {
                             use {diesel::prelude::*, schema::register::dsl};
                             let n: i64 = dsl::register
                                 .filter(dsl::feed.eq(&feed.name))
-                                .filter(dsl::guid.eq(&guid))
+                                .filter(dsl::guid.eq(&item.id))
                                 .count()
                                 .get_result(&db)?;
                             n != 0
@@ -253,11 +252,11 @@ async fn main() -> anyhow::Result<()> {
 
                         if already_got { continue; }
 
-                        start_download(&opts, &feed, &item, &date).await?;
+                        start_download(&opts, &feed, &item, &link, &date).await?;
 
                         let registration = models::NewRegistration {
                             feed: &feed.name,
-                            guid: &guid
+                            guid: &item.id
                         };
                         use diesel::prelude::*;
                         diesel::insert_into(schema::register::table)
