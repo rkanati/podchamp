@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Changed
 - Updated dependencies, including Tokio to 1.0.
+### Removed
+- dotenv support.
 
 ## [0.2.1] - 2020-11-08
 ### Changed

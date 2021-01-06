@@ -78,7 +78,6 @@ async fn start_download(
 async fn main() -> anyhow::Result<()> {
     let now = Utc::now();
 
-    dotenv::dotenv().ok();
     let opts = options::Options::load();
     let db = open_db(&opts.database_path)?;
 
