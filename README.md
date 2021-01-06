@@ -1,14 +1,11 @@
 
 # Podchamp
-
 **Work in progress.**
 
 ## what
-
 A no-frills tool for fetching your podcasts.
 
 ## why
-
 I've found very few podcast tools that aren't either horribly bloated (I don't want my downloader to
 also be a half-assed media player), decent-but-fragile (shell scripts; tries too hard to make
 sense of hopelessly broken feeds), or inflexible (insists on performing the download itself; wants
@@ -18,11 +15,9 @@ I've used [greg](https://github.com/manolomartinez/greg) for years now, but that
 more-or-less dead, and I don't like a few of its design choices, so this is a replacement of sorts.
 
 ## who
-
 It's for me. This will not get lots of extraneous features like playback or tagging; don't @ me.
 
 ## how
-
 Podchamp keeps a record of feeds and previously-downloaded episodes in a small database. When
 checking for new episodes, podchamp downloads the feed xml, parses it, and launches downloads for
 any episodes it doesn't remember downloading previously.
@@ -80,7 +75,8 @@ If you decide you don't like a podcast and want podchamp to stop fetching it, yo
 remove its feed:
 
 ```sh
-$ podchamp rm podsaveamerica
+# to hell with bean dad
+$ podchamp rm roderickontheline
 ```
 
 In case you want to re-download previous episodes of a podcast (say, you lost the files, or want
