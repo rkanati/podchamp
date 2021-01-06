@@ -123,7 +123,8 @@ async fn main() -> anyhow::Result<()> {
             }
             else {
                 for feed in results {
-                    println!("{} @{}", feed.name, feed.uri);
+                    // TODO make an effort to tabulate
+                    println!("{:16} {}", feed.name, feed.uri);
                 }
             }
         }
