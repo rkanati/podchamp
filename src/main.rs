@@ -74,7 +74,7 @@ async fn start_download(
     Ok(())
 }
 
-#[tokio::main]
+#[tokio::main(flavor = "current_thread")]
 async fn main() -> anyhow::Result<()> {
     let now = Utc::now();
 
