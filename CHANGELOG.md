@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated dependencies, including Tokio to 1.0.
 ### Removed
 - dotenv support.
+### Fixed
+- `mod ... backlog` no longer lies in its success message.
 
 ## [0.2.1] - 2020-11-08
 ### Changed

@@ -141,10 +141,10 @@ async fn main() -> anyhow::Result<()> {
 
                 Modification::Backlog{n} => {
                     use{diesel::prelude::*, schema::feeds::dsl as dsl};
-                    let n = diesel::update(dsl::feeds.filter(dsl::name.eq(feed)))
+                    let n_updated = diesel::update(dsl::feeds.filter(dsl::name.eq(feed)))
                         .set(dsl::backlog.eq(n.get() as i32))
                         .execute(&db)?;
-                    if n == 0 { bail!("{} is not a feed", feed); }
+                    if n_updated == 0 { bail!("{} is not a feed", feed); }
                     eprintln!("Changed {} backlog to {}", feed, n);
                 }
             }
