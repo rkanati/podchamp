@@ -1,6 +1,6 @@
 [package]
 name        = "podchamp"
-version     = "0.3.0"
+version     = "0.4.0"
 authors     = ["Rachel K <raech.kanati@gmail.com>"]
 repository  = "https://github.com/rkanati/podchamp"
 edition     = "2018"
