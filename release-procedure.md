@@ -8,5 +8,6 @@
     - chicken-and-egg with `git tag`; figure out the release link url
 - `git tag`
 - release on github?
+    - probably not; tags are fine by themselves
 - `cargo publish`
 
