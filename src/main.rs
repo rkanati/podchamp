@@ -17,14 +17,14 @@ mod schema;
 
 use {
     crate::options::*,
-    anyhow::{anyhow, bail},
+    anyhow::anyhow,
     chrono::prelude::*,
-    url::Url,
 };
 
+pub(crate) use anyhow::Result as Anyhow;
 pub(crate) use diesel::sqlite::SqliteConnection as Db;
 
-fn open_db(path: &std::path::Path) -> anyhow::Result<Db> {
+fn open_db(path: &std::path::Path) -> Anyhow<Db> {
     let bad_path_error = || anyhow!("Invalid database path");
 
     let dir = path.parent().ok_or_else(bad_path_error)?;
@@ -38,88 +38,60 @@ fn open_db(path: &std::path::Path) -> anyhow::Result<Db> {
     Ok(db)
 }
 
+#[derive(Clone)]
+struct SingleInstance(std::sync::Arc<std::sync::Mutex<Option<std::path::PathBuf>>>);
+
+impl SingleInstance {
+    fn new(rt_path: &std::path::Path) -> Anyhow<Self> {
+        std::fs::create_dir_all(rt_path)?;
+
+        let lockdir_path = rt_path.join("podchamp.lock.d");
+        std::fs::create_dir(&lockdir_path)?;
+
+        let pid = format!("{}", std::process::id());
+        std::fs::write(lockdir_path.join("pid"), &pid)?;
+
+        let utx = std::sync::Mutex::new(Some(lockdir_path));
+        Ok(SingleInstance(std::sync::Arc::new(utx)))
+    }
+
+    fn done(&self) {
+        if let Ok(mut lock) = self.0.lock() {
+            if let Some(path) = lock.take() {
+                let _ = std::fs::remove_dir_all(&path);
+            }
+        }
+    }
+}
 
 #[tokio::main(flavor = "current_thread")]
-async fn main() -> anyhow::Result<()> {
+async fn main() -> Anyhow<()> {
     let now = Utc::now();
 
     let opts = options::Options::load();
+
+    let instance = SingleInstance::new(&opts.runtime_dir_path)?;
+    std::panic::set_hook({
+        let hook = std::panic::take_hook();
+        let instance = instance.clone();
+        Box::new(move |info| {
+            instance.done();
+            (hook)(info)
+        })
+    });
+
     let db = open_db(&opts.database_path)?;
 
     match &opts.command {
-        Command::Add{name, link, backlog} => {
-            let backlog = backlog.map(|n| n.get()).unwrap_or(1);
-
-            let feed = models::NewFeed {
-                name,
-                uri: link.as_str(),
-                backlog: backlog as i32,
-                fetch_since: None
-            };
-
-            use diesel::{prelude::*, result::{Error, DatabaseErrorKind}};
-            diesel::insert_into(schema::feeds::table)
-                .values(&feed)
-                .execute(&db)
-                .map_err(|e| match e {
-                    Error::DatabaseError(DatabaseErrorKind::UniqueViolation, _)
-                        => anyhow!("{} already exists", name),
-                    e   => anyhow!(e)
-                })?;
-
-            eprintln!("Added {}", name);
-        }
-
-        Command::Rm{name} => {
-            use{diesel::prelude::*, schema::feeds::dsl as dsl};
-            let n = diesel::delete(dsl::feeds.filter(dsl::name.eq(name)))
-                .execute(&db)?;
-            if n == 0 {
-                eprintln!("{} is not a feed", name);
-            }
-        }
-
-        Command::Ls => {
-            use{diesel::prelude::*, schema::feeds::dsl as dsl};
-            let results = dsl::feeds
-                .load::<models::Feed>(&db)?;
-            if results.is_empty() {
-                eprintln!("No feeds. You can add one with `podchamp add`.");
-            }
-            else {
-                for feed in results {
-                    // TODO make an effort to tabulate
-                    println!("{:16} {}", feed.name, feed.uri);
-                }
-            }
-        }
-
-        Command::Mod{feed, how} => {
-            match how {
-                Modification::Link{link} => {
-                    use{diesel::prelude::*, schema::feeds::dsl as dsl};
-                    let n = diesel::update(dsl::feeds.filter(dsl::name.eq(feed)))
-                        .set(dsl::uri.eq(link.as_str()))
-                        .execute(&db)?;
-                    if n == 0 { bail!("{} is not a feed", feed); }
-                    eprintln!("Changed {} feed link to {}", feed, link);
-                }
-
-                Modification::Backlog{n} => {
-                    use{diesel::prelude::*, schema::feeds::dsl as dsl};
-                    let n_updated = diesel::update(dsl::feeds.filter(dsl::name.eq(feed)))
-                        .set(dsl::backlog.eq(n.get() as i32))
-                        .execute(&db)?;
-                    if n_updated == 0 { bail!("{} is not a feed", feed); }
-                    eprintln!("Changed {} backlog to {}", feed, n);
-                }
-            }
-        }
-
-        Command::Reset{feed} => commands::reset(&db, feed).await?,
-        Command::Fetch{feed} => commands::fetch(&opts, &db, feed.as_deref()).await?,
+        Command::Add{name, link, backlog} => commands::add(&db, name, link, *backlog).await?,
+        Command::Rm{name} => commands::rm(&db, name).await?,
+        Command::Ls => commands::ls(&db).await?,
+        Command::Mod{feed, how} => commands::mod_(&db, feed, how).await?,
+        Command::Reset{feed} => commands::reset(&db, Some(feed)).await?,
+        Command::Fetch{feed} => commands::fetch(now, &opts, &db, feed.as_deref()).await?,
     }
 
+    instance.done();
     Ok(())
 }
 

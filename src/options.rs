@@ -40,6 +40,39 @@ impl std::fmt::Display for DatabasePath {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct RuntimeDirPath(std::path::PathBuf);
+
+impl std::ops::Deref for RuntimeDirPath {
+    type Target = std::path::Path;
+    fn deref(&self) -> &std::path::Path {
+        &self.0
+    }
+}
+
+impl Default for RuntimeDirPath {
+    fn default() -> Self {
+        let dirs = directories::ProjectDirs::from("", "", "podchamp").unwrap();
+        let path = dirs.runtime_dir().unwrap();
+        RuntimeDirPath(path.into())
+    }
+}
+
+impl std::str::FromStr for RuntimeDirPath {
+    type Err = <std::path::PathBuf as std::str::FromStr>::Err;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        std::str::FromStr::from_str(s).map(RuntimeDirPath)
+    }
+}
+
+// XXX see Display for DatabasePath
+impl std::fmt::Display for RuntimeDirPath {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.0.to_str().unwrap())
+    }
+}
+
+
 // TODO replace clap with argh once it's more mature
 #[derive(Clap)]
 #[clap(about, author, version)]
@@ -47,6 +80,10 @@ pub struct Options {
     /// Path to Podchamp's database file
     #[clap(long, default_value, env = "PODCHAMP_DATABASE_PATH")]
     pub database_path: DatabasePath,
+
+    /// Path to a temporary folder
+    #[clap(long, default_value, env = "PODCHAMP_RUNTIME_DIR")]
+    pub runtime_dir_path: RuntimeDirPath,
 
     /// Command to invoke when downloading episodes
     ///
