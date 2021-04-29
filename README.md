@@ -1,9 +1,9 @@
 
 # Podchamp
-**Work in progress.**
-
 ## what
 A no-frills tool for fetching your podcasts.
+
+**Work in progress,** but I've been using it exclusively for six months without any major issues.
 
 ## why
 I've found very few podcast tools that aren't either horribly bloated (I don't want my downloader to
@@ -99,7 +99,6 @@ ask for support.
 ### yes
 
 - Config file - pretty minimal, probably.
-- Atom feeds - currently we only support RSS.
 - More metadata - only a few pieces of feed and episode metadata are available to download scripts,
   and it would be trivial to export more.
 - Tests - duh.
@@ -125,7 +124,7 @@ ask for support.
 
 ## whence
 
-[Rachel Knight](https://rkanati.github.io).
+[Rachel Knight](https://automorphi.city/).
 
 ## whither
 
