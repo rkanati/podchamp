@@ -7,25 +7,11 @@ mod options;
 
 use {
     crate::options::*,
-    anyhow::anyhow,
     chrono::prelude::*,
 };
 
 pub(crate) use anyhow::Result as Anyhow;
 pub(crate) use diesel::sqlite::SqliteConnection as Db;
-
-fn open_db(path: &std::path::Path) -> Anyhow<Db> {
-    let bad_path_error = || anyhow!("Invalid database path");
-
-    let dir = path.parent().ok_or_else(bad_path_error)?;
-    std::fs::create_dir_all(dir)?;
-
-    let path = path.to_str().ok_or_else(bad_path_error)?;
-    use diesel::prelude::*;
-    let db = SqliteConnection::establish(path)?;
-
-    Ok(db)
-}
 
 #[derive(Clone)]
 struct SingleInstance(std::sync::Arc<std::sync::Mutex<Option<std::path::PathBuf>>>);
@@ -69,7 +55,7 @@ async fn main() -> Anyhow<()> {
         })
     });
 
-    let db = open_db(&opts.database_path)?;
+    let db = podchamp::Database::open(&opts.database_path)?;
 
     match &opts.command {
         Command::Add{name, link, backlog} => commands::add(&db, name, link, *backlog).await?,
