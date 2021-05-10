@@ -1,5 +1,8 @@
 
-use crate::{Anyhow, models, schema, Db};
+use {
+    crate::{Anyhow, Db},
+    podchamp::{schema, models},
+};
 
 pub(crate)
 async fn ls(db: &Db) -> Anyhow<()> {

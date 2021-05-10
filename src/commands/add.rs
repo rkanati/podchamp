@@ -1,6 +1,7 @@
 
 use {
-    crate::{Anyhow, schema, Db, models},
+    crate::{Anyhow, Db},
+    podchamp::{schema, models},
     std::num::NonZeroU32,
     anyhow::anyhow,
     url::Url,

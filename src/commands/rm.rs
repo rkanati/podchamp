@@ -1,5 +1,8 @@
 
-use crate::{Anyhow, schema, Db};
+use {
+    crate::{Anyhow, Db},
+    podchamp::schema,
+};
 
 pub(crate)
 async fn rm(db: &Db, name: &str) -> Anyhow<()> {

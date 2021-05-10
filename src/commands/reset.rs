@@ -1,6 +1,7 @@
 
 use {
-    crate::{schema, Db},
+    crate::Db,
+    podchamp::schema,
     chrono::prelude::*,
 };
 

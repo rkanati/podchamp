@@ -1,6 +1,7 @@
 
 use {
-    crate::{Anyhow, schema, Db, options::Modification},
+    crate::{Anyhow, Db, options::Modification},
+    podchamp::schema,
     anyhow::bail,
 };
 

@@ -2,18 +2,8 @@
 #![forbid(unsafe_code)]
 #![feature(try_blocks)]
 
-#[macro_use]
-extern crate diesel;
-
-#[macro_use]
-extern crate diesel_migrations;
-
-embed_migrations!();
-
 mod commands;
-mod models;
 mod options;
-mod schema;
 
 use {
     crate::options::*,
@@ -33,7 +23,6 @@ fn open_db(path: &std::path::Path) -> Anyhow<Db> {
     let path = path.to_str().ok_or_else(bad_path_error)?;
     use diesel::prelude::*;
     let db = SqliteConnection::establish(path)?;
-    embedded_migrations::run(&db)?;
 
     Ok(db)
 }

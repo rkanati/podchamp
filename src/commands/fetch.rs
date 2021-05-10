@@ -1,6 +1,7 @@
 
 use {
-    crate::{Anyhow, schema, models, Db, Options},
+    crate::{Anyhow, Db, Options},
+    podchamp::{schema, models},
     anyhow::bail,
     chrono::prelude::*,
     futures::{
