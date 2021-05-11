@@ -1,13 +1,12 @@
 
 use {
-    crate::{Anyhow, Db},
-    podchamp::{schema, models},
+    crate::Anyhow,
+    podchamp::{Database, GetFeeds},
 };
 
 pub(crate)
-async fn ls(db: &Db) -> Anyhow<()> {
-    use{diesel::prelude::*, schema::feeds::dsl as dsl};
-    let results = dsl::feeds.load::<models::Feed>(db)?;
+async fn ls(db: &Database) -> Anyhow<()> {
+    let results = db.get_feeds(GetFeeds::All)?;
     if results.is_empty() {
         eprintln!("No feeds. You can add one with `podchamp add`.");
     }

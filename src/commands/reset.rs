@@ -1,30 +1,16 @@
 
 use {
-    crate::Db,
-    podchamp::schema,
-    chrono::prelude::*,
+    crate::Anyhow,
+    podchamp::Database,
 };
 
 pub(crate)
-async fn reset(db: &Db, feed: Option<&str>) -> anyhow::Result<()> {
+async fn reset(db: &mut Database, feed: Option<&str>) -> Anyhow<()> {
     if feed.is_none() {
         todo!("reset for all feeds");
     }
 
-    use diesel::prelude::*;
-
-    {
-        use schema::register::dsl as dsl;
-        diesel::delete(dsl::register.filter(dsl::feed.eq(feed.unwrap())))
-            .execute(db)?;
-    }
-
-    {
-        use schema::feeds::dsl as dsl;
-        diesel::update(dsl::feeds.filter(dsl::name.eq(feed.unwrap())))
-            .set(dsl::fetch_since.eq::<Option<NaiveDateTime>>(None))
-            .execute(db)?;
-    }
+    db.reset_register(feed.unwrap())?;
 
     eprintln!("Progress reset for {}", feed.unwrap_or("all feeds"));
     Ok(())

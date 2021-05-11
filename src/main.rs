@@ -11,7 +11,6 @@ use {
 };
 
 pub(crate) use anyhow::Result as Anyhow;
-pub(crate) use diesel::sqlite::SqliteConnection as Db;
 
 #[derive(Clone)]
 struct SingleInstance(std::sync::Arc<std::sync::Mutex<Option<std::path::PathBuf>>>);
@@ -55,15 +54,15 @@ async fn main() -> Anyhow<()> {
         })
     });
 
-    let db = podchamp::Database::open(&opts.database_path)?;
+    let mut db = podchamp::Database::open(&opts.database_path)?;
 
     match &opts.command {
-        Command::Add{name, link, backlog} => commands::add(&db, name, link, *backlog).await?,
-        Command::Rm{name} => commands::rm(&db, name).await?,
+        Command::Add{name, link, backlog} => commands::add(&mut db, name, link, *backlog).await?,
+        Command::Rm{name} => commands::rm(&mut db, name).await?,
         Command::Ls => commands::ls(&db).await?,
-        Command::Mod{feed, how} => commands::mod_(&db, feed, how).await?,
-        Command::Reset{feed} => commands::reset(&db, Some(feed)).await?,
-        Command::Fetch{feed} => commands::fetch(now, &opts, &db, feed.as_deref()).await?,
+        Command::Mod{feed, how} => commands::mod_(&mut db, feed, how).await?,
+        Command::Reset{feed} => commands::reset(&mut db, Some(feed)).await?,
+        Command::Fetch{feed} => commands::fetch(&mut db, feed.as_deref(), &opts, now).await?,
     }
 
     instance.done();

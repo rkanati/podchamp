@@ -1,7 +1,7 @@
 
 use {
-    crate::{Anyhow, Db, Options},
-    podchamp::{schema, models},
+    crate::{Anyhow, Options},
+    podchamp::{Database, GetFeeds, models::Feed},
     anyhow::bail,
     chrono::prelude::*,
     futures::{
@@ -13,19 +13,15 @@ use {
 
 pub(crate)
 async fn fetch<'a> (
-    now:  DateTime<Utc>,
+    db:   &'a mut Database,
+    feed: Option<&'_ str>,
     opts: &'a Options,
-    db:   &'a Db,
-    feed: Option<&'_ str>)
-    -> Anyhow<()>
-{
-    let feeds = {
-        use {diesel::prelude::*, schema::feeds::dsl::*};
-        let query =
-            if let Some(feed) = feed { feeds.filter(name.eq(feed)).into_boxed() }
-            else                     { feeds.into_boxed() };
-        query.load::<models::Feed>(db)?
-    };
+    now:  DateTime<Utc>,
+) -> Anyhow<()> {
+    let feeds = db.get_feeds(match feed {
+        None       => GetFeeds::All,
+        Some(feed) => GetFeeds::One(feed)
+    })?;
 
     if feeds.is_empty() {
         eprintln!("No feeds. You can add one with `podchamp add`.");
@@ -69,12 +65,11 @@ async fn fetch<'a> (
                     // with podcasts as they are normally understood. file a bug? not sure.
                     let link = item.media.iter()
                         .flat_map(|media_obj| media_obj.content.iter())
-                        .filter_map(|content| {
+                        .find_map(|content| {
                             let mime = content.content_type.as_ref()?;
                             if mime.type_() != "audio" { return None; }
                             content.url.as_ref()
-                        })
-                        .next()?;
+                        })?;
                     Some((item, link, date))
                 })
                 // ignore time-travellers
@@ -101,43 +96,22 @@ async fn fetch<'a> (
             };
 
             if set_fetch_since {
-                use{diesel::prelude::*, schema::feeds::dsl as dsl};
-                diesel::update(dsl::feeds.filter(dsl::name.eq(&feed.name)))
-                    .set(dsl::fetch_since.eq(Some(threshold.naive_utc())))
-                    .execute(db)?;
+                db.set_fetch_since(&feed.name, &threshold)?;
             };
 
             let to_fetch = recents.iter()
-                .filter(|(_, _, date)| date >= &threshold);
+                .take_while(|(_, _, date)| date >= &threshold);
 
             for (item, link, date) in to_fetch {
                 // TODO do this in one go for all newest items
-                let already_got = {
-                    use {diesel::prelude::*, schema::register::dsl};
-                    let n: i64 = dsl::register
-                        .filter(dsl::feed.eq(&feed.name))
-                        .filter(dsl::guid.eq(&item.id))
-                        .count()
-                        .get_result(db)?;
-                    n != 0
-                };
-
-                if already_got { continue; }
-
-                start_download(&opts, &feed, &item, &link, &date).await?;
-
-                let registration = models::NewRegistration {
-                    feed: &feed.name,
-                    guid: &item.id
-                };
-                use diesel::prelude::*;
-                diesel::insert_into(schema::register::table)
-                    .values(&registration)
-                    .execute(db)?;
+                if !db.is_episode_registered(&feed.name, &item.id)? {
+                    start_download(&opts, &feed, &item, &link, &date).await?;
+                    db.register_episode(&feed.name, &item.id)?;
+                }
             }
         };
 
-        if let Err(e) = result { println!("Fetch error: {}", e); }
+        if let Err(e) = result { eprintln!("Fetch error: {}", e); }
     }
 
     Ok(())
@@ -145,7 +119,7 @@ async fn fetch<'a> (
 
 async fn start_download(
     opts: &Options,
-    feed: &models::Feed,
+    feed: &Feed,
     item: &feed_rs::model::Entry,
     link: &Url,
     date: &DateTime<Utc>)
