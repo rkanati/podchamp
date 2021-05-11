@@ -2,11 +2,11 @@
 #![forbid(unsafe_code)]
 #![feature(try_blocks)]
 
-mod commands;
+mod fetch;
 mod options;
 
 use {
-    crate::options::*,
+    crate::{fetch::fetch, options::*},
     chrono::prelude::*,
 };
 
@@ -57,12 +57,45 @@ async fn main() -> Anyhow<()> {
     let mut db = podchamp::Database::open(&opts.database_path)?;
 
     match &opts.command {
-        Command::Add{name, link, backlog} => commands::add(&mut db, name, link, *backlog).await?,
-        Command::Rm{name} => commands::rm(&mut db, name).await?,
-        Command::Ls => commands::ls(&db).await?,
-        Command::Mod{feed, how} => commands::mod_(&mut db, feed, how).await?,
-        Command::Reset{feed} => commands::reset(&mut db, Some(feed)).await?,
-        Command::Fetch{feed} => commands::fetch(&mut db, feed.as_deref(), &opts, now).await?,
+        Command::Add{name, link, backlog} => {
+            let backlog = backlog.or(std::num::NonZeroU32::new(1)).unwrap();
+            db.add_feed(name, link, backlog)?;
+            eprintln!("Added {}", name);
+        }
+
+        Command::Rm{name} => {
+            db.remove_feed(name)?;
+        }
+
+        Command::Ls => {
+            let results = db.get_feeds(podchamp::GetFeeds::All)?;
+            if results.is_empty() { eprintln!("No feeds. You can add one with `podchamp add`."); }
+            for feed in results {
+                // TODO tabulate
+                println!("{:16} {}", feed.name, feed.uri);
+            }
+        }
+
+        Command::Mod{feed, how} => {
+            match how {
+                Modification::Link{link} => {
+                    db.set_link(feed, link)?;
+                    eprintln!("Changed {} feed link to {}", feed, link);
+                }
+
+                Modification::Backlog{n} => {
+                    db.set_backlog(feed, *n)?;
+                    eprintln!("Changed {} backlog to {}", feed, n);
+                }
+            }
+        }
+
+        Command::Reset{feed} => {
+            db.reset_register(&feed)?;
+            eprintln!("Progress reset for {}", feed);
+        }
+
+        Command::Fetch{feed} => fetch(&mut db, feed.as_deref(), &opts, now).await?,
     }
 
     instance.done();
