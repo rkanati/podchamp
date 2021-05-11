@@ -51,58 +51,36 @@ async fn fetch<'a> (
 
             let channel = feed_rs::parser::parse(&bytes[..])?;
 
-            let fetch_since: Option<DateTime<Utc>> = feed
-                .fetch_since
-                .map(|naive| DateTime::from_utc(naive, Utc));
-
             // build a list of most-recent episodes
-            let mut recents: Vec<_> = channel.entries.iter()
-                // ignore items with no date, or no actual episode to download
-                .filter_map(|item| {
-                    let date = item.published?;
-                    // TODO sort this out. as of feed-rs 0.6, rss enclosures are emulated with
-                    // mediarss media objects, but this is very janky and not really consistent
-                    // with podcasts as they are normally understood. file a bug? not sure.
-                    let link = item.media.iter()
-                        .flat_map(|media_obj| media_obj.content.iter())
-                        .find_map(|content| {
-                            let mime = content.content_type.as_ref()?;
-                            if mime.type_() != "audio" { return None; }
-                            content.url.as_ref()
-                        })?;
-                    Some((item, link, date))
-                })
-                // ignore time-travellers
-                .filter(|(_, _, date)| date < &now)
-                .collect();
-
+            let recents = collect_recent_episodes(&channel, &now);
             if recents.is_empty() {
                 eprintln!("{} contains no recognizable episodes", &feed.name);
                 continue;
             }
 
-            // sort the list by descending date
-            recents.sort_unstable_by_key(|(_, _, date)| std::cmp::Reverse(*date));
-
+            // find date of first episode within backlog
             let backlog_start_index = (feed.backlog as usize).max(1).min(recents.len()) - 1;
             let (_, _, backlog_start_date) = recents[backlog_start_index];
 
-            let (threshold, set_fetch_since) = if let Some(since) = fetch_since {
-                if since <= backlog_start_date { (since,              false) }
-                else                           { (backlog_start_date, true ) }
+            // figure out what date to fetch back to
+            let threshold = if let Some(since) = feed
+                .fetch_since
+                .map(|naive| DateTime::from_utc(naive, Utc))
+                .filter(|since| since <= &backlog_start_date)
+            {
+                // mature feed - keep fetching from the established date
+                since
             }
             else {
-                (backlog_start_date, true)
+                // new feed, or backlog increased back past since-date - fetch from start of
+                // backlog
+                db.set_fetch_since(&feed.name, &backlog_start_date)?;
+                backlog_start_date
             };
 
-            if set_fetch_since {
-                db.set_fetch_since(&feed.name, &threshold)?;
-            };
-
-            let to_fetch = recents.iter()
-                .take_while(|(_, _, date)| date >= &threshold);
-
-            for (item, link, date) in to_fetch {
+            for (item, link, date) in recents.iter()
+                .take_while(|(_, _, date)| date >= &threshold)
+            {
                 // TODO do this in one go for all newest items
                 if !db.is_episode_registered(&feed.name, &item.id)? {
                     start_download(&opts, &feed, &item, &link, &date).await?;
@@ -115,6 +93,35 @@ async fn fetch<'a> (
     }
 
     Ok(())
+}
+
+fn collect_recent_episodes<'c> (channel: &'c feed_rs::model::Feed, now: &DateTime<Utc>)
+    -> Vec<(&'c feed_rs::model::Entry, &'c Url, DateTime<Utc>)>
+{
+    let mut recents: Vec<_> = channel.entries.iter()
+        // ignore items with no date, or no actual episode to download
+        .filter_map(|item| {
+            let date = item.published?;
+            // TODO sort this out. as of feed-rs 0.6, rss enclosures are emulated with
+            // mediarss media objects, but this is very janky and not really consistent
+            // with podcasts as they are normally understood. file a bug? not sure.
+            let link = item.media.iter()
+                .flat_map(|media_obj| media_obj.content.iter())
+                .find_map(|content| {
+                    let mime = content.content_type.as_ref()?;
+                    if mime.type_() != "audio" { return None; }
+                    content.url.as_ref()
+                })?;
+            Some((item, link, date))
+        })
+        // ignore time-travellers
+        .filter(|(_, _, date)| date < &now)
+        .collect();
+
+    // sort the list by descending date
+    recents.sort_unstable_by_key(|(_, _, date)| std::cmp::Reverse(*date));
+
+    recents
 }
 
 async fn start_download(
