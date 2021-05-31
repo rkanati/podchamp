@@ -28,12 +28,19 @@ async fn fetch<'a> (
         return Ok(())
     }
 
+    {
+        eprint!("Fetching {}", &feeds[0].name);
+        for feed in &feeds[1..] {
+            eprint!(", {}", &feed.name);
+        }
+        eprintln!();
+    }
+
     let web_client = reqwest::Client::new();
     let mut channels = feeds.into_iter()
         .map(|feed| {
             let request = web_client.get(&feed.uri).build().unwrap();
             let web_client = web_client.clone();
-            eprintln!("Fetching {}", &feed.name);
             tokio::spawn(async move {
                 let result: Anyhow<_> = try {
                     web_client.execute(request).await?
@@ -43,6 +50,8 @@ async fn fetch<'a> (
             })
         })
         .collect::<FuturesUnordered<_>>();
+
+    let mut nothing_to_do = true;
 
     while let Some(join_result) = channels.next().await {
         let result: Anyhow<_> = try {
@@ -83,6 +92,7 @@ async fn fetch<'a> (
             {
                 // TODO do this in one go for all newest items
                 if !db.is_episode_registered(&feed.name, &item.id)? {
+                    nothing_to_do = false;
                     start_download(&opts, &feed, &item, &link, &date).await?;
                     db.register_episode(&feed.name, &item.id)?;
                 }
@@ -90,6 +100,10 @@ async fn fetch<'a> (
         };
 
         if let Err(e) = result { eprintln!("Fetch error: {}", e); }
+    }
+
+    if nothing_to_do {
+        eprintln!("Already up-to-date");
     }
 
     Ok(())
