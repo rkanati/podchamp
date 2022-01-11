@@ -209,9 +209,9 @@ dependencies = [
 
 [[package]]
 name = "feed-rs"
-version = "0.6.1"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f94e79fc5fbac9e1143a7af3c1b66c82edce080b8dff4d9e90bcd948d8d2aa8"
+checksum = "dc6f51721365322ea2b7920033d9625dfbb776dab5ced2585b5f66ff2220852d"
 dependencies = [
  "chrono",
  "lazy_static",
@@ -788,9 +788,9 @@ dependencies = [
 
 [[package]]
 name = "quick-xml"
-version = "0.20.0"
+version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "26aab6b48e2590e4a64d1ed808749ba06257882b461d01ca71baeb747074a6dd"
+checksum = "8533f14c8382aaad0d592c812ac3b826162128b65662331e1127b45c3d18536b"
 dependencies = [
  "encoding_rs",
  "memchr",
