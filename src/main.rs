@@ -38,6 +38,12 @@ impl SingleInstance {
     }
 }
 
+impl Drop for SingleInstance {
+    fn drop(&mut self) {
+        self.done();
+    }
+}
+
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Anyhow<()> {
     let now = Utc::now();
@@ -98,7 +104,6 @@ async fn main() -> Anyhow<()> {
         Command::Fetch{feed} => fetch(&mut db, feed.as_deref(), &opts, now).await?,
     }
 
-    instance.done();
     Ok(())
 }
 
