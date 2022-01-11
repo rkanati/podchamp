@@ -26,12 +26,6 @@ impl std::str::FromStr for DatabasePath {
     }
 }
 
-// XXX currently, clap uses Default to construct a default value...
-// ... and then immediately ToString=>Displays it, and then FromStrs it straight back
-// what the _fuck_
-// see https://github.com/clap-rs/clap/issues/1694
-// i doubt this will ever be fixed without turning clap on its head and making it typed all the way
-// through
 impl std::fmt::Display for DatabasePath {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}", self.0.to_str().unwrap())
@@ -63,15 +57,12 @@ impl std::str::FromStr for RuntimeDirPath {
     }
 }
 
-// XXX see Display for DatabasePath
 impl std::fmt::Display for RuntimeDirPath {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}", self.0.to_str().unwrap())
     }
 }
 
-
-// TODO replace clap with argh once it's more mature
 #[derive(clap::Parser)]
 #[clap(about, author, version)]
 pub struct Options {
