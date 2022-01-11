@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2022-01-11
+### Changed
+- Moved to rust edition 2021.
+- Updated dependencies.
+
 ## [0.5.0] - 2022-01-11
 ### Changed
 - Updated dependencies.
@@ -40,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Initial release.
 
 [Unreleased]: https://github.com/rkanati/podchamp/tree/master
+[0.5.1]: https://github.com/rkanati/podchamp/releases/tag/0.5.1
 [0.5.0]: https://github.com/rkanati/podchamp/releases/tag/0.5.0
 [0.4.0]: https://github.com/rkanati/podchamp/releases/tag/0.4.0
 [0.3.0]: https://github.com/rkanati/podchamp/releases/tag/0.3.0

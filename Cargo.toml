@@ -1,6 +1,6 @@
 [package]
 name        = "podchamp"
-version     = "0.5.0"
+version     = "0.5.1"
 authors     = ["Rachel Knight <rachel@automorphi.city>"]
 repository  = "https://github.com/rkanati/podchamp"
 edition     = "2021"
