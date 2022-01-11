@@ -47,15 +47,6 @@ impl Database {
     }
 }
 
-// TODO remove/replace with explicit method once standard ops are added to `Database`
-impl std::ops::Deref for Database {
-    type Target = diesel::sqlite::SqliteConnection;
-
-    fn deref(&self) -> &Self::Target {
-        &self.conn
-    }
-}
-
 #[derive(Debug, Error)]
 pub enum AddFeedError {
     #[error("feed named {0} already in database")]
