@@ -1,8 +1,6 @@
 
 use url::Url;
 
-use clap::Clap;
-
 #[derive(Clone, Debug)]
 pub struct DatabasePath(std::path::PathBuf);
 
@@ -74,15 +72,15 @@ impl std::fmt::Display for RuntimeDirPath {
 
 
 // TODO replace clap with argh once it's more mature
-#[derive(Clap)]
+#[derive(clap::Parser)]
 #[clap(about, author, version)]
 pub struct Options {
     /// Path to Podchamp's database file
-    #[clap(long, default_value, env = "PODCHAMP_DATABASE_PATH")]
+    #[clap(long, default_value_t, env = "PODCHAMP_DATABASE_PATH")]
     pub database_path: DatabasePath,
 
     /// Path to a temporary folder
-    #[clap(long, default_value, env = "PODCHAMP_RUNTIME_DIR")]
+    #[clap(long, default_value_t, env = "PODCHAMP_RUNTIME_DIR")]
     pub runtime_dir_path: RuntimeDirPath,
 
     /// Command to invoke when downloading episodes
@@ -105,11 +103,12 @@ pub struct Options {
 
 impl Options {
     pub fn load() -> Self {
+        use clap::Parser;
         Self::parse()
     }
 }
 
-#[derive(Clap)]
+#[derive(clap::Parser)]
 pub enum Command {
     /// Add a feed
     Add {
@@ -158,7 +157,7 @@ pub enum Command {
     },
 }
 
-#[derive(Clap)]
+#[derive(clap::Parser)]
 pub enum Modification {
     /// Set the feed's link
     Link {

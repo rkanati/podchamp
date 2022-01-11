@@ -16,11 +16,6 @@ embed_migrations!();
 pub mod models;
 pub mod schema;
 
-pub fn run_migrations(db: &diesel::sqlite::SqliteConnection) -> anyhow::Result<()> {
-    embedded_migrations::run(db)?;
-    Ok(())
-}
-
 pub struct Database {
     conn: diesel::sqlite::SqliteConnection,
 }
@@ -33,6 +28,8 @@ pub enum OpenDatabaseError {
     CreateDirectory(std::io::Error),
     #[error(transparent)]
     Diesel(#[from] diesel::result::ConnectionError),
+    #[error(transparent)]
+    Migration(#[from] diesel_migrations::RunMigrationsError),
 }
 
 impl Database {
@@ -43,6 +40,7 @@ impl Database {
         let path = path.to_str().ok_or(OpenDatabaseError::InvalidPath)?;
         use diesel::prelude::*;
         let conn = SqliteConnection::establish(path)?;
+        embedded_migrations::run(&conn)?;
 
         let db = Database{conn};
         Ok(db)
