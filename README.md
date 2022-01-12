@@ -45,7 +45,7 @@ version of mine:
 set dir "$HOME/podcasts/$PODCHAMP_FEED"
 mkdir -p "$dir"
 cd "$dir"
-wget -q "$PODCAST_URI" -O - | \
+wget -q "$argv[1]" -O - | \
     nice ffmpeg -y \
     -i pipe:0 -c:a libopus -b:a 64k \
     -metadata title="$PODCHAMP_DATE - $PODCHAMP_TITLE" \
