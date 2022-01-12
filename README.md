@@ -35,10 +35,10 @@ $ podchamp fetch
 Fetching mbmbam
 ```
 
-If there are new episodes of MBMBaM, podchamp launches `PODCHAMP_DOWNLOADER` with the download link
-as an argument. By default this is just wget, which is not super-useful; it's intended that you
-write your own script that does whatever you feel is appropriate. For example, here's a simplified
-version of mine:
+If there are new episodes of any of your feeds, podchamp launches `PODCHAMP_DOWNLOADER` for each of
+them, with the download link as the sole argument. By default this is just wget, which is not
+super-useful; it's intended that you write your own script that does whatever you feel is
+appropriate. For example, here's a simplified version of mine:
 
 ```fish
 #!/usr/bin/fish
@@ -52,6 +52,11 @@ wget -q "$argv[1]" -O - | \
     -metadata artist="$PODCHAMP_FEED" \
     "$PODCHAMP_DATE - $PODCHAMP_TITLE.opus"
 ```
+
+As you can see, the downloader is also passed a few useful things in environment variables:
+- `PODCHAMP_FEED`: this is the name you gave the feed when you `add`ed it.
+- `PODCHAMP_DATE`: the publication date of the episode, `yyyy-mm-dd`.
+- `PODCHAMP_TITLE`: the title of the episode.
 
 Normally, when you add a new feed, it has a _backlog_ of 1. This means it will download only the
 most recent episode the first time you fetch, and every episode newer than it subsequently. If you
