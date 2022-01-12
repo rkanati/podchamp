@@ -1,6 +1,7 @@
 
 use {
-    crate::schema::*,
+    crate::database::schema::*,
+    std::borrow::Cow,
     chrono::prelude::*,
 };
 
@@ -21,33 +22,19 @@ use {
 //    }
 //}
 
-#[derive(Queryable)]
-pub struct Feed {
-    pub name:        String,
-    pub uri:         String,
-    pub backlog:     i32,
-    pub fetch_since: Option<NaiveDateTime>,
-}
-
-#[derive(Insertable)]
+#[derive(Queryable, Insertable)]
 #[table_name="feeds"]
-pub struct NewFeed<'a> {
-    pub name:        &'a str,
-    pub uri:         &'a str,
+pub struct Feed<'a> {
+    pub name:        Cow<'a, str>,
+    pub uri:         Cow<'a, str>,
     pub backlog:     i32,
     pub fetch_since: Option<NaiveDateTime>,
 }
 
-#[derive(Queryable)]
-pub struct Registration {
-    pub feed: String,
-    pub guid: String,
-}
-
-#[derive(Insertable)]
+#[derive(Queryable, Insertable)]
 #[table_name="register"]
-pub struct NewRegistration<'a> {
-    pub feed: &'a str,
-    pub guid: &'a str,
+pub struct Registration<'a> {
+    pub feed: Cow<'a, str>,
+    pub guid: Cow<'a, str>,
 }
 

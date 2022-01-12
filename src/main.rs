@@ -1,11 +1,11 @@
 
 #![forbid(unsafe_code)]
 
-mod fetch;
+mod command_fetch;
 mod options;
 
 use {
-    crate::{fetch::fetch, options::*},
+    crate::{command_fetch::fetch, options::*},
     chrono::prelude::*,
 };
 
