@@ -11,6 +11,72 @@ use {
     url::Url,
 };
 
+struct RecentEpisode<'c> {
+    entry: &'c feed_rs::model::Entry,
+    url: &'c Url,
+    when: DateTime<Utc>,
+}
+
+fn fetch_threshold(feed: &Feed, recents: &[RecentEpisode<'_>])
+    -> (DateTime<Utc>, bool)
+{
+    // find date of first episode within backlog
+    let backlog_start_index = (feed.backlog as usize).max(1).min(recents.len()) - 1;
+    let backlog_start_date = recents[backlog_start_index].when;
+
+    // figure out what date to fetch back to
+    if let Some(since) = feed
+        .fetch_since
+        .map(|naive| DateTime::from_utc(naive, Utc))
+        .filter(|since| since <= &backlog_start_date)
+    {
+        // mature feed - keep fetching from the established date
+        (since, false)
+    }
+    else {
+        // new feed, or backlog increased back past since-date - fetch from start of
+        // backlog
+        (backlog_start_date, true)
+    }
+}
+
+async fn fetch_feed(
+    join_result: Result<(Feed, reqwest::Result<bytes::Bytes>), tokio::task::JoinError>,
+    db: &mut Database,
+    now: DateTime<Utc>,
+    opts: &Options,
+) -> Anyhow<u32> {
+    let (feed, fetch_result) = join_result?;
+    let bytes = fetch_result?;
+    let channel = feed_rs::parser::parse(&bytes[..])?;
+
+    // build a list of most-recent episodes
+    let recents = collect_recent_episodes(&channel, &now);
+    if recents.is_empty() {
+        bail!("{} contains no recognizable episodes", &feed.name);
+    }
+
+    // figure out how far back to fetch
+    let (threshold, update_db) = fetch_threshold(&feed, &recents);
+    if update_db {
+        db.set_fetch_since(&feed.name, &threshold)?;
+    }
+
+    let mut n_fetched = 0;
+    for RecentEpisode{entry, url, when} in recents.iter()
+        .take_while(|recent| recent.when >= threshold)
+    {
+        // TODO do this in one go for all newest items
+        if !db.is_episode_registered(&feed.name, &entry.id)? {
+            start_download(&opts, &feed, &entry, &url, &when).await?;
+            n_fetched += 1;
+            db.register_episode(&feed.name, &entry.id)?;
+        }
+    }
+
+    Ok(n_fetched)
+}
+
 pub(crate)
 async fn fetch<'a> (
     db:   &'a mut Database,
@@ -28,13 +94,11 @@ async fn fetch<'a> (
         return Ok(())
     }
 
-    {
-        eprint!("Fetching {}", &feeds[0].name);
-        for feed in &feeds[1..] {
-            eprint!(", {}", &feed.name);
-        }
-        eprintln!();
+    eprint!("Fetching {}", &feeds[0].name);
+    for feed in &feeds[1..] {
+        eprint!(", {}", &feed.name);
     }
+    eprintln!();
 
     let web_client = reqwest::Client::new();
     let mut channels = feeds.into_iter()
@@ -42,67 +106,25 @@ async fn fetch<'a> (
             let request = web_client.get(&feed.uri).build().unwrap();
             let web_client = web_client.clone();
             tokio::spawn(async move {
-                let result: Anyhow<_> = try {
-                    web_client.execute(request).await?
-                        .bytes().await?
+                let resp = match web_client.execute(request).await {
+                    Ok(resp) => resp,
+                    Err(e) => return (feed, Anyhow::from(Err(e)))
                 };
-                (feed, result)
+                let result = resp.bytes().await;
+                (feed, Anyhow::from(result))
             })
         })
         .collect::<FuturesUnordered<_>>();
 
-    let mut nothing_to_do = true;
-
+    let mut n_fetched = 0;
     while let Some(join_result) = channels.next().await {
-        let result: Anyhow<_> = try {
-            let (feed, fetch_result) = join_result?;
-            let bytes = fetch_result?;
-
-            let channel = feed_rs::parser::parse(&bytes[..])?;
-
-            // build a list of most-recent episodes
-            let recents = collect_recent_episodes(&channel, &now);
-            if recents.is_empty() {
-                eprintln!("{} contains no recognizable episodes", &feed.name);
-                continue;
-            }
-
-            // find date of first episode within backlog
-            let backlog_start_index = (feed.backlog as usize).max(1).min(recents.len()) - 1;
-            let (_, _, backlog_start_date) = recents[backlog_start_index];
-
-            // figure out what date to fetch back to
-            let threshold = if let Some(since) = feed
-                .fetch_since
-                .map(|naive| DateTime::from_utc(naive, Utc))
-                .filter(|since| since <= &backlog_start_date)
-            {
-                // mature feed - keep fetching from the established date
-                since
-            }
-            else {
-                // new feed, or backlog increased back past since-date - fetch from start of
-                // backlog
-                db.set_fetch_since(&feed.name, &backlog_start_date)?;
-                backlog_start_date
-            };
-
-            for (item, link, date) in recents.iter()
-                .take_while(|(_, _, date)| date >= &threshold)
-            {
-                // TODO do this in one go for all newest items
-                if !db.is_episode_registered(&feed.name, &item.id)? {
-                    nothing_to_do = false;
-                    start_download(&opts, &feed, &item, &link, &date).await?;
-                    db.register_episode(&feed.name, &item.id)?;
-                }
-            }
-        };
-
-        if let Err(e) = result { eprintln!("Fetch error: {}", e); }
+        match fetch_feed(join_result, db, now, opts).await {
+            Ok(n)  => { n_fetched += n; }
+            Err(e) => { eprintln!("Fetch error: {}", e); }
+        }
     }
 
-    if nothing_to_do {
+    if n_fetched == 0 {
         eprintln!("Already up-to-date");
     }
 
@@ -110,30 +132,30 @@ async fn fetch<'a> (
 }
 
 fn collect_recent_episodes<'c> (channel: &'c feed_rs::model::Feed, now: &DateTime<Utc>)
-    -> Vec<(&'c feed_rs::model::Entry, &'c Url, DateTime<Utc>)>
+    -> Vec<RecentEpisode<'c>>
 {
     let mut recents: Vec<_> = channel.entries.iter()
         // ignore items with no date, or no actual episode to download
-        .filter_map(|item| {
-            let date = item.published?;
+        .filter_map(|entry| {
+            let when = entry.published?;
             // TODO sort this out. as of feed-rs 0.6, rss enclosures are emulated with
             // mediarss media objects, but this is very janky and not really consistent
             // with podcasts as they are normally understood. file a bug? not sure.
-            let link = item.media.iter()
+            let url = entry.media.iter()
                 .flat_map(|media_obj| media_obj.content.iter())
                 .find_map(|content| {
                     let mime = content.content_type.as_ref()?;
                     if mime.type_() != "audio" { return None; }
                     content.url.as_ref()
                 })?;
-            Some((item, link, date))
+            Some(RecentEpisode{entry, url, when})
         })
         // ignore time-travellers
-        .filter(|(_, _, date)| date < &now)
+        .filter(|recent| &recent.when < now)
         .collect();
 
     // sort the list by descending date
-    recents.sort_unstable_by_key(|(_, _, date)| std::cmp::Reverse(*date));
+    recents.sort_unstable_by_key(|recent| std::cmp::Reverse(recent.when));
 
     recents
 }

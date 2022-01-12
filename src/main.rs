@@ -1,6 +1,5 @@
 
 #![forbid(unsafe_code)]
-#![feature(try_blocks)]
 
 mod fetch;
 mod options;
